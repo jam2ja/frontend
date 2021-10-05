@@ -1,13 +1,12 @@
-import { ApplicationRef, ChangeDetectorRef, Component, OnInit, Input, Output, EventEmitter } from "@angular/core";
+import { Component, OnInit, Input } from "@angular/core";
 import { GlobalVarsService } from "../../global-vars.service";
-import { BackendApiService, BackendRoutes } from "../../backend-api.service";
+import { BackendApiService } from "../../backend-api.service";
 import { sprintf } from "sprintf-js";
-import { Router, ActivatedRoute, Params } from "@angular/router";
-import { HttpClient, HttpErrorResponse } from "@angular/common/http";
+import { HttpClient } from "@angular/common/http";
 import { SwalHelper } from "../../../lib/helpers/swal-helper";
-import Swal from "sweetalert2";
 import { IdentityService } from "../../identity.service";
 import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
+import { Observable } from "rxjs";
 
 class Messages {
   static INCORRECT_PASSWORD = `The password you entered was incorrect.`;
@@ -33,6 +32,7 @@ export class BuyDeSoEthComponent implements OnInit {
   // Current balance in ETH
   ethBalance = 0;
   loadingBalance = false;
+  loadingFee = false;
 
   // Network fees in ETH (with sane default)
   ethFeeEstimate = 0.002;
@@ -46,10 +46,13 @@ export class BuyDeSoEthComponent implements OnInit {
   // User errors
   error = "";
 
+  static instructionsPerBasicTransfer = 22000;
+
   constructor(
     public globalVars: GlobalVarsService,
     private backendApi: BackendApiService,
-    private identityService: IdentityService
+    private identityService: IdentityService,
+    private httpClient: HttpClient
   ) {}
 
   ethDepositAddress(): string {
@@ -244,8 +247,7 @@ export class BuyDeSoEthComponent implements OnInit {
       this.ethToExchange = Number(this.ethToExchange);
 
       // Update the other value
-      this.desoToBuy =
-        this.computeNanosToCreateGivenETHToBurn(this.ethToExchange) / GlobalVarsService.NANOS_PER_UNIT;
+      this.desoToBuy = this.computeNanosToCreateGivenETHToBurn(this.ethToExchange) / GlobalVarsService.NANOS_PER_UNIT;
     }
   }
 
@@ -253,25 +255,50 @@ export class BuyDeSoEthComponent implements OnInit {
     return 1 + this.globalVars.BuyDeSoFeeBasisPoints / (100 * 100);
   }
 
-  refreshBalance() {
-    if (this.loadingBalance) {
-      return;
-    }
-
-    this.loadingBalance = true;
-
-    this.backendApi.GetETHBalance(this.globalVars.localNode, this.ethDepositAddress()).subscribe(
-      (res: any) => {
-        this.loadingBalance = false;
-        this.ethBalance = res.Balance / GlobalVarsService.WEI_PER_ETH;
-        this.ethFeeEstimate = res.Fees / GlobalVarsService.WEI_PER_ETH;
-        this.ethToExchange = this.ethFeeEstimate;
+  makeCloudflareETHRequest(method: string, params: string[] = []): Observable<any> {
+    return this.httpClient.post(
+      "https://cloudflare-eth.com",
+      {
+        jsonrpc: "2.0",
+        method,
+        params,
+        id: 1,
       },
-      (error) => {
-        this.loadingBalance = false;
-        console.error("Error getting ETH Balance data: ", error);
+      {
+        headers: { "Content-Type": "application/json" },
       }
     );
+  }
+
+  refreshBalance() {
+    if (!this.loadingBalance) {
+      this.loadingBalance = true;
+      this.makeCloudflareETHRequest("eth_getBalance", [this.ethDepositAddress(), "latest"])
+        .subscribe(
+          (res) => {
+            this.ethBalance = this.globalVars.weiHexToETH(res.result);
+          },
+          (err) => {
+            console.error(err);
+          }
+        )
+        .add(() => (this.loadingBalance = false));
+    }
+    if (!this.loadingFee) {
+      this.loadingFee = true;
+      this.makeCloudflareETHRequest("eth_gasPrice")
+        .subscribe(
+          (res) => {
+            this.ethFeeEstimate =
+              BuyDeSoEthComponent.instructionsPerBasicTransfer * this.globalVars.weiHexToETH(res.result);
+            this.ethToExchange = this.ethFeeEstimate;
+          },
+          (err) => {
+            console.error(err);
+          }
+        )
+        .add(() => (this.loadingFee = false));
+    }
   }
 
   ngOnInit() {
