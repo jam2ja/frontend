@@ -1653,12 +1653,6 @@ export class BackendApiService {
     });
   }
 
-  GetETHBalance(endpoint: string, Address: string): Observable<any> {
-    return this.post(endpoint, BackendRoutes.RoutePathGetETHBalance, {
-      Address,
-    });
-  }
-
   AdminGetVerifiedUsers(endpoint: string, AdminPublicKey: string): Observable<any> {
     return this.jwtPost(endpoint, BackendRoutes.RoutePathAdminGetVerifiedUsers, AdminPublicKey, {
       AdminPublicKey,
