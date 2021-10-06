@@ -7,8 +7,8 @@ import { SwalHelper } from "../../../lib/helpers/swal-helper";
 import { IdentityService } from "../../identity.service";
 import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
 import { Observable } from "rxjs";
-import { ethers, UnsignedTransaction } from "ethers";
-import * as Web3 from "web3";
+import { ethers, UnsignedTransaction, Transaction } from "ethers";
+// import * as Web3 from "web3";
 // import * as Common from "@ethereumjs/common";
 // import * as Tx from "@ethereumjs/tx";
 
@@ -177,13 +177,16 @@ export class BuyDeSoEthComponent implements OnInit {
             //   type: 2,
             // };
             // const common = new Common.default({ chain: "ropsten" });
-            let rawTx = {
+            let rawTx: UnsignedTransaction = {
               nonce,
-              from: this.getETHGatewayURL(),
+              // from: this.ethDepositAddress(),
               to: this.globalVars.buyETHAddress,
-              gasLimit: ethers.utils.parseUnits("21000").toHexString(),
-              maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
-              value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
+              gasLimit: ethers.utils.parseUnits("21000"),
+              maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()),
+              value: ethers.utils.parseEther(this.ethToExchange.toString()),
+              chainId: 3,
+              data: "",
+              type: 2,
             };
             // let tx = fromTxData(rawTx);
             // Web3 transaction attempt
@@ -197,7 +200,7 @@ export class BuyDeSoEthComponent implements OnInit {
             debugger;
             // console.log(rawTx);
             const txHex = ethers.utils.serializeTransaction(rawTx);
-            const transaction = ethers.utils.parseTransaction(txHex);
+            // const transaction = ethers.utils.parseTransaction(txHex);
             console.log(txHex);
             this.backendApi
               .ExchangeETHNew(
