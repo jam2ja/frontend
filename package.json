@@ -33,6 +33,7 @@
     "cipher-base": "^1.0.4",
     "confetti-js": "github:deso-protocol/confetti-js",
     "core-js": "^2.5.4",
+    "crypto": "^1.0.1",
     "currency-symbol-map": "^5.0.1",
     "ethers": "^5.4.7",
     "fs": "0.0.1-security",
@@ -56,6 +57,7 @@
     "tslib": "^2.0.0",
     "tus-js-client": "^2.3.0",
     "underscore": "^1.9.1",
+    "web3": "^1.6.0",
     "webpack": "^4.41.2",
     "zone.js": "~0.10.2"
   },

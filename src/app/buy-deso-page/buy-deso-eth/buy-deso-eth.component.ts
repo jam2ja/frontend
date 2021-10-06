@@ -8,6 +8,9 @@ import { IdentityService } from "../../identity.service";
 import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
 import { Observable } from "rxjs";
 import { ethers, UnsignedTransaction } from "ethers";
+import * as Web3 from "web3";
+// import * as Common from "@ethereumjs/common";
+// import * as Tx from "@ethereumjs/tx";
 
 class Messages {
   static INCORRECT_PASSWORD = `The password you entered was incorrect.`;
@@ -160,56 +163,94 @@ export class BuyDeSoEthComponent implements OnInit {
     }).then((res: any) => {
       if (res.isConfirmed) {
         // Get the nonce first
-        this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress()]).subscribe((res) => {
-          const nonce = res.result;
-          // TODO: Construct unsigned transaction, send it to identity and yadda yadda
-          let rawTx: UnsignedTransaction = {
-            nonce,
-            to: this.globalVars.buyETHAddress,
-            maxFeePerGas: "",
-            maxPriorityFeePerGas: "",
-            value: "",
-            chainId: 1,
-            data: "",
-            type: 0,
-          };
-          //   FeeMarketEIP1559Transaction.fromTxData({
-          //   nonce,
-          //   maxPriorityFeePerGas: "",
-          //   maxFeePerGas: "",
-          //
-          // });
-          const txHex = ethers.utils.serializeTransaction(rawTx);
-        });
+        this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress(), "latest"]).subscribe(
+          (res) => {
+            const nonce = res.result;
+            // TODO: Construct unsigned transaction, send it to identity and yadda yadda
+            // let rawTx: UnsignedTransaction = {
+            //   nonce,
+            //   to: this.globalVars.buyETHAddress,
+            //   // from: this.ethDepositAddress(),
+            //   maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()),
+            //   value: ethers.utils.parseEther(this.ethToExchange.toString()),
+            //   chainId: this.getChainID(),
+            //   type: 2,
+            // };
+            // const common = new Common.default({ chain: "ropsten" });
+            let rawTx = {
+              nonce,
+              from: this.getETHGatewayURL(),
+              to: this.globalVars.buyETHAddress,
+              gasLimit: ethers.utils.parseUnits("21000").toHexString(),
+              maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
+              value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
+            };
+            // let tx = fromTxData(rawTx);
+            // Web3 transaction attempt
+            // web3.eth.sendTransaction();
+            //   FeeMarketEIP1559Transaction.fromTxData({
+            //   nonce,
+            //   maxPriorityFeePerGas: "",
+            //   maxFeePerGas: "",
+            //
+            // });
+            debugger;
+            // console.log(rawTx);
+            const txHex = ethers.utils.serializeTransaction(rawTx);
+            const transaction = ethers.utils.parseTransaction(txHex);
+            console.log(txHex);
+            this.backendApi
+              .ExchangeETHNew(
+                this.globalVars.localNode,
+                this.globalVars.loggedInUser.PublicKeyBase58Check,
+                txHex.slice(2),
+                {
+                  // chainId: this.getChainID(),
+                  to: this.globalVars.buyETHAddress,
+                  value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
+                  maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
+                  type: 2,
+                }
+              )
+              .subscribe(
+                (res) => {
+                  console.log(res);
+                },
+                (err) => {
+                  console.error(err);
+                }
+              );
+          }
+        );
         // Execute the buy
         this.parentComponent.waitingOnTxnConfirmation = true;
-        this.backendApi
-          .ExchangeETH(
-            this.globalVars.localNode,
-            this.globalVars.loggedInUser.PublicKeyBase58Check,
-            this.ethDepositAddress(),
-            Math.floor(this.ethToExchange * GlobalVarsService.WEI_PER_ETH)
-          )
-          .subscribe(
-            (res) => {
-              // Reset all the form fields
-              this.error = "";
-              this.desoToBuy = 0;
-              this.ethToExchange = 0;
-
-              // This will update the balance and a bunch of other things.
-              this.globalVars.updateEverything(
-                res.DESOTxHash,
-                this.parentComponent._clickBuyDeSoSuccess,
-                this.parentComponent._clickBuyDeSoSuccessButTimeout,
-                this.parentComponent
-              );
-            },
-            (err) => {
-              this.globalVars.logEvent("bitpop : buy : error");
-              this.parentComponent._clickBuyDeSoFailure(this.parentComponent, this.extractError(err));
-            }
-          );
+        // this.backendApi
+        //   .ExchangeETH(
+        //     this.globalVars.localNode,
+        //     this.globalVars.loggedInUser.PublicKeyBase58Check,
+        //     this.ethDepositAddress(),
+        //     Math.floor(this.ethToExchange * GlobalVarsService.WEI_PER_ETH)
+        //   )
+        //   .subscribe(
+        //     (res) => {
+        //       // Reset all the form fields
+        //       this.error = "";
+        //       this.desoToBuy = 0;
+        //       this.ethToExchange = 0;
+        //
+        //       // This will update the balance and a bunch of other things.
+        //       this.globalVars.updateEverything(
+        //         res.DESOTxHash,
+        //         this.parentComponent._clickBuyDeSoSuccess,
+        //         this.parentComponent._clickBuyDeSoSuccessButTimeout,
+        //         this.parentComponent
+        //       );
+        //     },
+        //     (err) => {
+        //       this.globalVars.logEvent("bitpop : buy : error");
+        //       this.parentComponent._clickBuyDeSoFailure(this.parentComponent, this.extractError(err));
+        //     }
+        //   );
       }
     });
   }
@@ -268,7 +309,7 @@ export class BuyDeSoEthComponent implements OnInit {
     } else {
       // Convert the string value to a number
       this.ethToExchange = Number(this.ethToExchange);
-
+      // debugger;
       // Update the other value
       this.desoToBuy = this.computeNanosToCreateGivenETHToBurn(this.ethToExchange) / GlobalVarsService.NANOS_PER_UNIT;
     }
@@ -278,9 +319,20 @@ export class BuyDeSoEthComponent implements OnInit {
     return 1 + this.globalVars.BuyDeSoFeeBasisPoints / (100 * 100);
   }
 
+  projectId = "30aa4e03c01d47bc81a24a7ef3ae0e94";
+  getETHGatewayURL(): string {
+    return `https://ropsten.infura.io/v3/${this.projectId}`;
+  }
+
+  getChainID(): number {
+    // ropsten = 3, mainnet = 1
+    return 3;
+  }
+
   makeCloudflareETHRequest(method: string, params: string[] = []): Observable<any> {
+    // let's try infura for now actually
     return this.httpClient.post(
-      "https://cloudflare-eth.com",
+      this.getETHGatewayURL(),
       {
         jsonrpc: "2.0",
         method,
@@ -309,7 +361,7 @@ export class BuyDeSoEthComponent implements OnInit {
     }
     if (!this.loadingFee) {
       this.loadingFee = true;
-      this.makeCloudflareETHRequest("eth_gasPrice")
+      this.makeCloudflareETHRequest("eth_maxPriorityFeePerGas")
         .subscribe(
           (res) => {
             this.ethFeeEstimate =
