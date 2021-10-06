@@ -7,6 +7,7 @@ import { SwalHelper } from "../../../lib/helpers/swal-helper";
 import { IdentityService } from "../../identity.service";
 import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
 import { Observable } from "rxjs";
+import { ethers, UnsignedTransaction } from "ethers";
 
 class Messages {
   static INCORRECT_PASSWORD = `The password you entered was incorrect.`;
@@ -158,6 +159,28 @@ export class BuyDeSoEthComponent implements OnInit {
       reverseButtons: true,
     }).then((res: any) => {
       if (res.isConfirmed) {
+        // Get the nonce first
+        this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress()]).subscribe((res) => {
+          const nonce = res.result;
+          // TODO: Construct unsigned transaction, send it to identity and yadda yadda
+          let rawTx: UnsignedTransaction = {
+            nonce,
+            to: this.globalVars.buyETHAddress,
+            maxFeePerGas: "",
+            maxPriorityFeePerGas: "",
+            value: "",
+            chainId: 1,
+            data: "",
+            type: 0,
+          };
+          //   FeeMarketEIP1559Transaction.fromTxData({
+          //   nonce,
+          //   maxPriorityFeePerGas: "",
+          //   maxFeePerGas: "",
+          //
+          // });
+          const txHex = ethers.utils.serializeTransaction(rawTx);
+        });
         // Execute the buy
         this.parentComponent.waitingOnTxnConfirmation = true;
         this.backendApi
