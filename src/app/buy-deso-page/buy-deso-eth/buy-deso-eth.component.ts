@@ -6,11 +6,11 @@ import { HttpClient } from "@angular/common/http";
 import { SwalHelper } from "../../../lib/helpers/swal-helper";
 import { IdentityService } from "../../identity.service";
 import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
-import { Observable } from "rxjs";
-import { ethers, UnsignedTransaction, Transaction } from "ethers";
-// import * as Web3 from "web3";
-// import * as Common from "@ethereumjs/common";
-// import * as Tx from "@ethereumjs/tx";
+import { Observable, of } from "rxjs";
+import Web3 from "web3";
+import Common, { Chain, Hardfork } from "@ethereumjs/common";
+import { Transaction } from "@ethereumjs/tx";
+import { FeeMarketEIP1559TxData } from "@ethereumjs/tx/src/types";
 
 class Messages {
   static INCORRECT_PASSWORD = `The password you entered was incorrect.`;
@@ -163,68 +163,44 @@ export class BuyDeSoEthComponent implements OnInit {
     }).then((res: any) => {
       if (res.isConfirmed) {
         // Get the nonce first
-        this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress(), "latest"]).subscribe(
-          (res) => {
-            const nonce = res.result;
-            // TODO: Construct unsigned transaction, send it to identity and yadda yadda
-            // let rawTx: UnsignedTransaction = {
-            //   nonce,
-            //   to: this.globalVars.buyETHAddress,
-            //   // from: this.ethDepositAddress(),
-            //   maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()),
-            //   value: ethers.utils.parseEther(this.ethToExchange.toString()),
-            //   chainId: this.getChainID(),
-            //   type: 2,
-            // };
-            // const common = new Common.default({ chain: "ropsten" });
-            let rawTx: UnsignedTransaction = {
-              nonce,
-              // from: this.ethDepositAddress(),
-              to: this.globalVars.buyETHAddress,
-              gasLimit: ethers.utils.parseUnits("21000"),
-              maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()),
-              value: ethers.utils.parseEther(this.ethToExchange.toString()),
-              chainId: 3,
-              data: "",
-              type: 2,
-            };
-            // let tx = fromTxData(rawTx);
-            // Web3 transaction attempt
-            // web3.eth.sendTransaction();
-            //   FeeMarketEIP1559Transaction.fromTxData({
-            //   nonce,
-            //   maxPriorityFeePerGas: "",
-            //   maxFeePerGas: "",
-            //
-            // });
-            debugger;
-            // console.log(rawTx);
-            const txHex = ethers.utils.serializeTransaction(rawTx);
-            // const transaction = ethers.utils.parseTransaction(txHex);
-            console.log(txHex);
-            this.backendApi
-              .ExchangeETHNew(
-                this.globalVars.localNode,
-                this.globalVars.loggedInUser.PublicKeyBase58Check,
-                txHex.slice(2),
-                {
-                  // chainId: this.getChainID(),
-                  to: this.globalVars.buyETHAddress,
-                  value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
-                  maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
-                  type: 2,
-                }
-              )
-              .subscribe(
-                (res) => {
-                  console.log(res);
-                },
-                (err) => {
-                  console.error(err);
-                }
-              );
-          }
-        );
+        // this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress(), "latest"]).subscribe(
+        of({ result: "0" }).subscribe((res) => {
+          const nonce = res.result;
+          // TODO: Construct unsigned transaction, send it to identity and yadda yadda
+          const common = new Common({ chain: Chain.Ropsten, hardfork: Hardfork.London });
+          let rawTx: FeeMarketEIP1559TxData = {
+            nonce: Web3.utils.toHex(parseInt(nonce)),
+            // from: this.ethDepositAddress(),
+            to: this.globalVars.buyETHAddress,
+            // gasLimit: Web3.utils.toHex(21000),
+            maxPriorityFeePerGas: Web3.utils.toHex(Math.floor(this.ethFeeEstimate * 1e18)),
+            value: Web3.utils.toHex(Math.floor(this.ethToExchange * 1e18)),
+            chainId: Web3.utils.toHex(Chain.Ropsten),
+          };
+          let tx = Transaction.fromTxData(rawTx, { common });
+
+          this.backendApi
+            .ExchangeETHNew(
+              this.globalVars.localNode,
+              this.globalVars.loggedInUser.PublicKeyBase58Check,
+              tx.hash().toString("hex"),
+              {
+                // chainId: this.getChainID(),
+                // to: this.globalVars.buyETHAddress,
+                // value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
+                // maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
+                // type: 2,
+              }
+            )
+            .subscribe(
+              (res) => {
+                console.log(res);
+              },
+              (err) => {
+                console.error(err);
+              }
+            );
+        });
         // Execute the buy
         this.parentComponent.waitingOnTxnConfirmation = true;
         // this.backendApi
@@ -325,11 +301,6 @@ export class BuyDeSoEthComponent implements OnInit {
   projectId = "30aa4e03c01d47bc81a24a7ef3ae0e94";
   getETHGatewayURL(): string {
     return `https://ropsten.infura.io/v3/${this.projectId}`;
-  }
-
-  getChainID(): number {
-    // ropsten = 3, mainnet = 1
-    return 3;
   }
 
   makeCloudflareETHRequest(method: string, params: string[] = []): Observable<any> {
