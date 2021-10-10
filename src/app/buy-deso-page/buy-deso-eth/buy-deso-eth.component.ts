@@ -9,8 +9,11 @@ import { BuyDeSoComponent } from "../buy-deso/buy-deso.component";
 import { Observable, of } from "rxjs";
 import Web3 from "web3";
 import Common, { Chain, Hardfork } from "@ethereumjs/common";
-import { Transaction } from "@ethereumjs/tx";
+import { FeeMarketEIP1559Transaction, Transaction } from "@ethereumjs/tx";
 import { FeeMarketEIP1559TxData } from "@ethereumjs/tx/src/types";
+import { map, switchMap } from "rxjs/operators";
+
+const feeMarketTransaction = FeeMarketEIP1559Transaction;
 
 class Messages {
   static INCORRECT_PASSWORD = `The password you entered was incorrect.`;
@@ -162,44 +165,84 @@ export class BuyDeSoEthComponent implements OnInit {
       reverseButtons: true,
     }).then((res: any) => {
       if (res.isConfirmed) {
-        // Get the nonce first
+        // Get the nonce firs let me know if you have questions - I think I'm missing something about transaction construction t
         // this.makeCloudflareETHRequest("eth_getTransactionCount", [this.ethDepositAddress(), "latest"]).subscribe(
         of({ result: "0" }).subscribe((res) => {
           const nonce = res.result;
           // TODO: Construct unsigned transaction, send it to identity and yadda yadda
           const common = new Common({ chain: Chain.Ropsten, hardfork: Hardfork.London });
-          let rawTx: FeeMarketEIP1559TxData = {
+          let txData: FeeMarketEIP1559TxData = {
             nonce: Web3.utils.toHex(parseInt(nonce)),
             // from: this.ethDepositAddress(),
             to: this.globalVars.buyETHAddress,
             // gasLimit: Web3.utils.toHex(21000),
+            maxFeePerGas: Web3.utils.toHex(Math.floor(this.ethFeeEstimate * 2e18)),
             maxPriorityFeePerGas: Web3.utils.toHex(Math.floor(this.ethFeeEstimate * 1e18)),
             value: Web3.utils.toHex(Math.floor(this.ethToExchange * 1e18)),
             chainId: Web3.utils.toHex(Chain.Ropsten),
+            accessList: [],
+            gasLimit: Web3.utils.toHex(Math.floor(this.ethFeeEstimate * 1e18)),
+            data: "0x00",
+            // type: 2,
           };
-          let tx = Transaction.fromTxData(rawTx, { common });
-
-          this.backendApi
-            .ExchangeETHNew(
-              this.globalVars.localNode,
-              this.globalVars.loggedInUser.PublicKeyBase58Check,
-              tx.hash().toString("hex"),
-              {
-                // chainId: this.getChainID(),
-                // to: this.globalVars.buyETHAddress,
-                // value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
-                // maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
-                // type: 2,
-              }
-            )
-            .subscribe(
-              (res) => {
-                console.log(res);
-              },
-              (err) => {
-                console.error(err);
-              }
-            );
+          let tx = feeMarketTransaction.fromTxData(txData, { common });
+          const toSign = [tx.getMessageToSign(true).toString("hex")];
+          this.identityService
+            .burn({
+              ...this.identityService.identityServiceParamsForKey(this.globalVars.loggedInUser.PublicKeyBase58Check),
+              unsignedHashes: toSign,
+            })
+            .subscribe((res) => {
+              console.log(res);
+              const signature: { s: any; r: any; v: number | null } = res.signedHashes[0];
+              debugger;
+              const signedTxData: FeeMarketEIP1559TxData = {
+                ...txData,
+                ...signature,
+              };
+              debugger;
+              const signedTx = FeeMarketEIP1559Transaction.fromTxData(signedTxData, { common });
+              const signedHash = signedTx.serialize().toString("hex");
+              this.backendApi
+                .SubmitETHTx(
+                  this.globalVars.localNode,
+                  this.globalVars.loggedInUser.PublicKeyBase58Check,
+                  signedTx,
+                  toSign,
+                  [signedHash]
+                )
+                .subscribe(
+                  (res) => {
+                    console.log(res);
+                  },
+                  (err) => {
+                    console.error(err);
+                  }
+                );
+            });
+          // .pipe(map((signed) => ({ ...res, ...signed })));
+          // this.backendApi
+          //   .ExchangeETHNew(
+          //     this.globalVars.localNode,
+          //     this.globalVars.loggedInUser.PublicKeyBase58Check,
+          //     // tx.hash().toString("hex"),
+          //     tx.getMessageToSign(true).toString("hex"),
+          //     {
+          //       // chainId: this.getChainID(),
+          //       // to: this.globalVars.buyETHAddress,
+          //       // value: ethers.utils.parseEther(this.ethToExchange.toString()).toHexString(),
+          //       // maxPriorityFeePerGas: ethers.utils.parseEther(this.ethFeeEstimate.toString()).toHexString(),
+          //       // type: 2,
+          //     }
+          //   )
+          //   .subscribe(
+          //     (res) => {
+          //       console.log(res);
+          //     },
+          //     (err) => {
+          //       console.error(err);
+          //     }
+          //   );
         });
         // Execute the buy
         this.parentComponent.waitingOnTxnConfirmation = true;
