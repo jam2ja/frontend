@@ -188,28 +188,25 @@ export class BuyDeSoEthComponent implements OnInit {
           let tx = feeMarketTransaction.fromTxData(txData, { common });
           const toSign = [tx.getMessageToSign(true).toString("hex")];
           this.identityService
-            .burn({
+            .burnETH({
               ...this.identityService.identityServiceParamsForKey(this.globalVars.loggedInUser.PublicKeyBase58Check),
               unsignedHashes: toSign,
             })
             .subscribe((res) => {
               console.log(res);
-              const signature: { s: any; r: any; v: number | null } = res.signedHashes[0];
-              debugger;
+              const signature: { s: any; r: any; v: number | null } = res.signatures[0];
               const signedTxData: FeeMarketEIP1559TxData = {
                 ...txData,
                 ...signature,
               };
-              debugger;
               const signedTx = FeeMarketEIP1559Transaction.fromTxData(signedTxData, { common });
-              const signedHash = signedTx.serialize().toString("hex");
+              const txBytes = signedTx.serialize().toString("hex");
               this.backendApi
                 .SubmitETHTx(
                   this.globalVars.localNode,
                   this.globalVars.loggedInUser.PublicKeyBase58Check,
                   signedTx,
-                  toSign,
-                  [signedHash]
+                  txBytes,
                 )
                 .subscribe(
                   (res) => {

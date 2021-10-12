@@ -1632,7 +1632,7 @@ export class BackendApiService {
 
     req = req.pipe(
       switchMap((res) =>
-        this.SubmitETHTx(endpoint, PublicKeyBase58Check, res.Tx, res.ToSign, res.signedHashes).pipe(
+        this.SubmitETHTx(endpoint, PublicKeyBase58Check, res.Tx, null).pipe(
           map((submitted) => ({ ...res, ...submitted }))
         )
       )
@@ -1641,7 +1641,7 @@ export class BackendApiService {
     return req;
   }
 
-  ExchangeETHNew(endpoint: string, PublicKeyBase58Check: string, txHex: string, Tx: any): Observable<any> {
+  ExchangeETHNew(endpoint: string, PublicKeyBase58Check: string, txHex: string, Tx: any, TxBytes: string): Observable<any> {
     const txYo: any = { ToSign: [txHex], Tx };
     let req = of(txYo);
     req = req.pipe(
@@ -1657,7 +1657,7 @@ export class BackendApiService {
 
     req = req.pipe(
       switchMap((res) =>
-        this.SubmitETHTx(endpoint, PublicKeyBase58Check, res.Tx, res.ToSign, res.signedHashes).pipe(
+        this.SubmitETHTx(endpoint, PublicKeyBase58Check, res.Tx, TxBytes).pipe(
           map((submitted) => ({ ...res, ...submitted }))
         )
       )
@@ -1677,14 +1677,12 @@ export class BackendApiService {
     endpoint: string,
     PublicKeyBase58Check: string,
     Tx: any,
-    ToSign: string[],
-    SignedHashes: string[]
+    TxBytes: string,
   ): Observable<any> {
     return this.post(endpoint, BackendRoutes.RoutePathSubmitETHTx, {
       PublicKeyBase58Check,
       Tx,
-      ToSign,
-      SignedHashes,
+      TxBytes,
     });
   }
 
