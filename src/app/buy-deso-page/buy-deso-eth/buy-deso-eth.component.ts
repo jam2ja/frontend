@@ -185,6 +185,7 @@ export class BuyDeSoEthComponent implements OnInit {
           chainId: toHex(this.getChain()),
           accessList: [],
         };
+        console.log(txData);
         const options = { common: this.common };
         // Generate an Unsigned EIP 1559 Fee Market Transaction from the data and generated a hash message to sign.
         let tx = feeMarketTransaction.fromTxData(txData, options);
@@ -202,6 +203,7 @@ export class BuyDeSoEthComponent implements OnInit {
               ...txData,
               ...signature,
             };
+            console.log(signedTxData);
             // Construct and serialize the transaction.
             const signedTx = FeeMarketEIP1559Transaction.fromTxData(signedTxData, options);
             const signedHash = signedTx.serialize().toString("hex");
