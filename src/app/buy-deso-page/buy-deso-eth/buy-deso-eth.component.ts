@@ -329,6 +329,7 @@ export class BuyDeSoEthComponent implements OnInit {
     if (!this.loadingFee) {
       this.loadingFee = true;
       this.getFees().then((res) => {
+        console.log(res);
         this.ethFeeEstimate = this.fromWeiToEther(res.totalFees);
         this.ethToExchange = this.ethFeeEstimate;
       });
@@ -355,8 +356,8 @@ export class BuyDeSoEthComponent implements OnInit {
   }
 
   // Gets the data about the pending block.
-  getPendingBlock(): Promise<any> {
-    return this.queryETHRPC("eth_getBlockByNumber", ["pending", false]);
+  getLatestBlock(): Promise<any> {
+    return this.queryETHRPC("eth_getBlockByNumber", ["latest", false]);
   }
 
   getTransactionCount(address: string, block: string = "pending"): Promise<number> {
@@ -379,7 +380,7 @@ export class BuyDeSoEthComponent implements OnInit {
     maxFeePerGasHex: Hex;
     totalFees: number;
   }> {
-    return Promise.all([this.getPendingBlock(), this.getGasPrice()]).then(([block, gasPrice]) => {
+    return Promise.all([this.getLatestBlock(), this.getGasPrice()]).then(([block, gasPrice]) => {
       const baseFeePerGas = hexToNumber((block as any).baseFeePerGas);
       const gasPriceHex = toHex(gasPrice);
 
